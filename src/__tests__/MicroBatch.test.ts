@@ -4,8 +4,6 @@ import { Job } from '../Job';
 import { JobResult } from '../JobResult';
 import { MicroBatch } from '../MicroBatch';
 
-jest.useFakeTimers();
-
 const mockBatchProcessor: BatchProcessor = {
   processBatch: jest.fn(
     (jobs: Job[]) =>
@@ -21,14 +19,20 @@ describe('MicroBatch', () => {
   let batchConfig: BatchConfig;
 
   beforeEach(() => {
-    (mockBatchProcessor.processBatch as jest.Mock).mockClear();
+    jest.useFakeTimers();
     batchProcessor = mockBatchProcessor;
+    (batchProcessor.processBatch as jest.Mock).mockClear();
     batchConfig = new BatchConfig(2, 1000);
     microBatch = new MicroBatch(batchConfig, batchProcessor);
   });
 
   afterEach(() => {
-    microBatch.shutdown();
+    if (microBatch.isStarted) {
+      microBatch.shutdown();
+    }
+
+    jest.clearAllTimers();
+    jest.useRealTimers();
   });
 
   it('should submit a job and return a result', async () => {
@@ -49,7 +53,7 @@ describe('MicroBatch', () => {
 
     jest.advanceTimersByTime(2000);
 
-    expect(mockBatchProcessor.processBatch).toHaveBeenCalledTimes(2);
+    expect(batchProcessor.processBatch).toHaveBeenCalledTimes(2);
   });
 
   it('should process all previously accepted Jobs after shutdown is called', async () => {
@@ -63,13 +67,13 @@ describe('MicroBatch', () => {
 
     await microBatch.shutdown();
 
-    expect(mockBatchProcessor.processBatch).toHaveBeenCalledTimes(2);
+    expect(batchProcessor.processBatch).toHaveBeenCalledTimes(2);
   });
 
   it('should not process a batch if there are no jobs', async () => {
     jest.advanceTimersByTime(2000);
 
-    expect(mockBatchProcessor.processBatch).not.toHaveBeenCalled();
+    expect(batchProcessor.processBatch).not.toHaveBeenCalled();
   });
 
   it('should not process a batch if the batch size is 0', async () => {
@@ -81,7 +85,7 @@ describe('MicroBatch', () => {
 
     jest.advanceTimersByTime(2000);
 
-    expect(mockBatchProcessor.processBatch).not.toHaveBeenCalled();
+    expect(batchProcessor.processBatch).not.toHaveBeenCalled();
   });
 
   it('should not process a batch if the frequency is 0', async () => {
@@ -93,7 +97,7 @@ describe('MicroBatch', () => {
 
     jest.advanceTimersByTime(2000);
 
-    expect(mockBatchProcessor.processBatch).not.toHaveBeenCalled();
+    expect(batchProcessor.processBatch).not.toHaveBeenCalled();
   });
 
   it('should not accept new jobs after shutdown', async () => {
@@ -103,5 +107,42 @@ describe('MicroBatch', () => {
     await expect(microBatch.submit(job)).rejects.toThrow(
       'Cannot submit job while shutting down'
     );
+  });
+
+  it('should handle batches that take longer than the interval', async () => {
+    const originalProcessBatch = batchProcessor.processBatch;
+    batchProcessor.processBatch = jest.fn(async (jobs: Job[]) => {
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      console.log('processed');
+    });
+
+    const job1 = new Job();
+    const job2 = new Job();
+    const job3 = new Job();
+
+    await microBatch.submit(job1);
+    await microBatch.submit(job2);
+    await microBatch.submit(job3);
+
+    jest.advanceTimersByTime(1500);
+
+    expect(batchProcessor.processBatch).toHaveBeenCalledTimes(1);
+
+    const shutdownPromise = microBatch.shutdown();
+
+    jest.advanceTimersByTime(1500);
+
+    await shutdownPromise;
+
+    expect(batchProcessor.processBatch).toHaveBeenCalledTimes(2);
+    expect(batchProcessor.processBatch).toHaveBeenNthCalledWith(1, [
+      job1,
+      job2,
+    ]);
+    expect(batchProcessor.processBatch).toHaveBeenNthCalledWith(2, [job3]);
+
+    expect(microBatch['jobQueue']).toHaveLength(0);
+
+    batchProcessor.processBatch = originalProcessBatch;
   });
 });

@@ -6,7 +6,7 @@ import { JobResult } from './JobResult';
 export class MicroBatch {
   private jobQueue: Job[] = [];
   private intervalId: NodeJS.Timeout | null = null;
-  private isStarted: boolean = false;
+  public isStarted: boolean = false;
   private isShuttingDown: boolean = false;
 
   constructor(
@@ -69,5 +69,7 @@ export class MicroBatch {
     while (this.jobQueue.length > 0) {
       await this.processBatch();
     }
+
+    this.isStarted = false;
   }
 }
