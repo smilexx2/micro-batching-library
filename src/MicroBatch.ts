@@ -6,11 +6,16 @@ import { JobResult } from './JobResult';
 export class MicroBatch {
   private jobQueue: Job[] = [];
   private intervalId: NodeJS.Timeout | null = null;
+  private isStarted: boolean = false;
 
   constructor(
     private batchConfig: BatchConfig,
     private batchProcessor: BatchProcessor
   ) {
+    if (!this.batchConfig.isValid()) {
+      return;
+    }
+
     this.start();
   }
 
@@ -37,14 +42,20 @@ export class MicroBatch {
   }
 
   start(): void {
+    this.isStarted = true;
     this.intervalId = setInterval(() => {
       this.processBatch();
     }, this.batchConfig.getFrequency());
   }
 
   async shutdown(): Promise<void> {
+    if (!this.isStarted) {
+      return;
+    }
+
     if (this.intervalId) {
       clearInterval(this.intervalId);
+      this.intervalId = null;
     }
 
     // Process all remaining jobs before shutting down

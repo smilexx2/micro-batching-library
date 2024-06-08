@@ -10,7 +10,6 @@ const mockBatchProcessor: BatchProcessor = {
   processBatch: jest.fn(
     (jobs: Job[]) =>
       new Promise((resolve) => {
-        console.log('processing batch', jobs);
         resolve();
       })
   ),
@@ -68,6 +67,30 @@ describe('MicroBatch', () => {
   });
 
   it('should not process a batch if there are no jobs', async () => {
+    jest.advanceTimersByTime(2000);
+
+    expect(mockBatchProcessor.processBatch).not.toHaveBeenCalled();
+  });
+
+  it('should not process a batch if the batch size is 0', async () => {
+    const batchConfig = new BatchConfig(0, 1000);
+    microBatch = new MicroBatch(batchConfig, batchProcessor);
+
+    const job = new Job();
+    await microBatch.submit(job);
+
+    jest.advanceTimersByTime(2000);
+
+    expect(mockBatchProcessor.processBatch).not.toHaveBeenCalled();
+  });
+
+  it('should not process a batch if the frequency is 0', async () => {
+    const batchConfig = new BatchConfig(2, 0);
+    microBatch = new MicroBatch(batchConfig, batchProcessor);
+
+    const job = new Job();
+    await microBatch.submit(job);
+
     jest.advanceTimersByTime(2000);
 
     expect(mockBatchProcessor.processBatch).not.toHaveBeenCalled();

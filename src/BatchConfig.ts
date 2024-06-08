@@ -11,4 +11,8 @@ export class BatchConfig {
   getFrequency(): number {
     return this.frequency;
   }
+
+  isValid(): boolean {
+    return this.batchSize > 0 && this.frequency > 0;
+  }
 }
