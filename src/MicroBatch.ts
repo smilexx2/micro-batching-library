@@ -7,6 +7,7 @@ export class MicroBatch {
   private jobQueue: Job[] = [];
   private intervalId: NodeJS.Timeout | null = null;
   private isStarted: boolean = false;
+  private isShuttingDown: boolean = false;
 
   constructor(
     private batchConfig: BatchConfig,
@@ -20,6 +21,10 @@ export class MicroBatch {
   }
 
   async submit(job: Job): Promise<JobResult> {
+    if (this.isShuttingDown) {
+      throw new Error('Cannot submit job while shutting down');
+    }
+
     this.jobQueue.push(job);
     return new JobResult();
   }
@@ -52,6 +57,8 @@ export class MicroBatch {
     if (!this.isStarted) {
       return;
     }
+
+    this.isShuttingDown = true;
 
     if (this.intervalId) {
       clearInterval(this.intervalId);

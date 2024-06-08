@@ -95,4 +95,13 @@ describe('MicroBatch', () => {
 
     expect(mockBatchProcessor.processBatch).not.toHaveBeenCalled();
   });
+
+  it('should not accept new jobs after shutdown', async () => {
+    await microBatch.shutdown();
+
+    const job = new Job();
+    await expect(microBatch.submit(job)).rejects.toThrow(
+      'Cannot submit job while shutting down'
+    );
+  });
 });
