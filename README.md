@@ -42,6 +42,22 @@ const job = new Job();
 microBatch.submit(job);
 ```
 
+## Testing
+
+This project uses Jest for testing. To run the tests, you first need to install the project dependencies. You can do this by running:
+
+```bash
+npm install
+```
+
+Once the dependencies are installed, you can run the tests with:
+
+```bash
+npm test
+```
+
+This will run all test files in the project.
+
 ## API
 
 ### `MicroBatch`
