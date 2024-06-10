@@ -8,6 +8,7 @@ export class MicroBatch {
   private intervalId: NodeJS.Timeout | null = null;
   public isStarted: boolean = false;
   private isShuttingDown: boolean = false;
+  private isProcessing: boolean = false; // Indicates if a batch is currently being processed
 
   constructor(
     private batchConfig: BatchConfig,
@@ -26,13 +27,25 @@ export class MicroBatch {
     }
 
     this.jobQueue.push(job);
+    console.log('Job submitted:', this.jobQueue);
     return new JobResult();
   }
 
   async processBatch(): Promise<void> {
-    if (this.jobQueue.length === 0) {
+    // If there are no jobs, then there is nothing to process
+    // If a batch is currently being processed, then we skip this interval
+    if (this.jobQueue.length === 0 || this.isProcessing) {
+      console.log(
+        'Skip processing batch:',
+        this.jobQueue,
+        `Still processing: ${this.isProcessing}`
+      );
       return;
     }
+
+    console.log('Processing batch:', this.jobQueue);
+
+    this.isProcessing = true;
 
     const jobsToProcess = this.jobQueue.splice(
       0,
@@ -44,10 +57,15 @@ export class MicroBatch {
     }
 
     await this.batchProcessor.processBatch(jobsToProcess);
+    this.isProcessing = false;
+
+    console.log('Batch processed:', jobsToProcess);
   }
 
   start(): void {
     this.isStarted = true;
+
+    console.log('Starting...');
     this.intervalId = setInterval(() => {
       this.processBatch();
     }, this.batchConfig.getFrequency());
@@ -58,6 +76,12 @@ export class MicroBatch {
       return;
     }
 
+    console.log(
+      'Shutting down...',
+      this.jobQueue,
+      `Still processing: ${this.isProcessing}`
+    );
+
     this.isShuttingDown = true;
 
     if (this.intervalId) {
@@ -66,10 +90,17 @@ export class MicroBatch {
     }
 
     // Process all remaining jobs before shutting down
-    while (this.jobQueue.length > 0) {
+    while (this.jobQueue.length > 0 || this.isProcessing) {
+      console.log(
+        'Processing remaining jobs...',
+        this.jobQueue,
+        this.isProcessing
+      );
       await this.processBatch();
     }
 
     this.isStarted = false;
+
+    console.log('Shutdown complete');
   }
 }

@@ -1,12 +1,14 @@
 {
-  "name": "micro-batching-library",
-  "version": "1.0.0",
+  "name": "@smilexx2/micro-batching-library",
+  "version": "1.0.8",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
-    "build": "tsc"
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [],
   "author": "",
@@ -19,5 +21,15 @@
     "ts-jest": "^29.1.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5"
-  }
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smilexx2/micro-batching-library.git"
+  },
+  "files": [
+    "dist"
+  ]
 }

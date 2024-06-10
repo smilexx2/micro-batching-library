@@ -1,1 +1,6 @@
-export class Job {}
+export class Job {
+  jobId: string = '';
+  constructor(jobId: string) {
+    this.jobId = jobId;
+  }
+}

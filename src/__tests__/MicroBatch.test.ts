@@ -13,6 +13,23 @@ const mockBatchProcessor: BatchProcessor = {
   ),
 };
 
+/**
+ * This function is used to advance the setInterval timer and
+ * wait for all batch processing to complete
+ */
+async function advanceTimersAndResolvePromises(intervalCount: number) {
+  for (let i = 0; i < intervalCount; i++) {
+    // Advance the timer to the next interval
+    // jest.advanceTimersByTime(1); // Advance by 1ms to trigger the next timer
+    jest.runOnlyPendingTimers(); // Run only the timers that are due
+
+    // Ensure all pending async operations have resolved
+    await Promise.resolve();
+
+    // If more timers are pending, they will be picked up in the next iteration
+  }
+}
+
 describe('MicroBatch', () => {
   let microBatch: MicroBatch;
   let batchProcessor: BatchProcessor;
@@ -27,39 +44,37 @@ describe('MicroBatch', () => {
   });
 
   afterEach(() => {
-    if (microBatch.isStarted) {
-      microBatch.shutdown();
-    }
+    microBatch.shutdown();
 
     jest.clearAllTimers();
     jest.useRealTimers();
   });
 
   it('should submit a job and return a result', async () => {
-    const job = new Job();
+    const job = new Job('Job 1');
     const result = await microBatch.submit(job);
 
     expect(result).toBeInstanceOf(JobResult);
   });
 
   it('should process a batch of jobs', async () => {
-    const job1 = new Job();
-    const job2 = new Job();
-    const job3 = new Job();
+    const job1 = new Job('Job 1');
+    const job2 = new Job('Job 2');
+    const job3 = new Job('Job 3');
 
     await microBatch.submit(job1);
     await microBatch.submit(job2);
     await microBatch.submit(job3);
 
-    jest.advanceTimersByTime(2000);
+    await advanceTimersAndResolvePromises(2);
 
     expect(batchProcessor.processBatch).toHaveBeenCalledTimes(2);
   });
 
   it('should process all previously accepted Jobs after shutdown is called', async () => {
-    const job1 = new Job();
-    const job2 = new Job();
-    const job3 = new Job();
+    const job1 = new Job('Job 1');
+    const job2 = new Job('Job 2');
+    const job3 = new Job('Job 3');
 
     await microBatch.submit(job1);
     await microBatch.submit(job2);
@@ -80,7 +95,7 @@ describe('MicroBatch', () => {
     const batchConfig = new BatchConfig(0, 1000);
     microBatch = new MicroBatch(batchConfig, batchProcessor);
 
-    const job = new Job();
+    const job = new Job('Job 1');
     await microBatch.submit(job);
 
     jest.advanceTimersByTime(2000);
@@ -92,7 +107,7 @@ describe('MicroBatch', () => {
     const batchConfig = new BatchConfig(2, 0);
     microBatch = new MicroBatch(batchConfig, batchProcessor);
 
-    const job = new Job();
+    const job = new Job('Job 1');
     await microBatch.submit(job);
 
     jest.advanceTimersByTime(2000);
@@ -103,7 +118,7 @@ describe('MicroBatch', () => {
   it('should not accept new jobs after shutdown', async () => {
     await microBatch.shutdown();
 
-    const job = new Job();
+    const job = new Job('Job 1');
     await expect(microBatch.submit(job)).rejects.toThrow(
       'Cannot submit job while shutting down'
     );
@@ -112,27 +127,25 @@ describe('MicroBatch', () => {
   it('should handle batches that take longer than the interval', async () => {
     const originalProcessBatch = batchProcessor.processBatch;
     batchProcessor.processBatch = jest.fn(async (jobs: Job[]) => {
-      await new Promise((resolve) => setTimeout(resolve, 1100));
-      console.log('processed');
+      await new Promise((resolve) => setTimeout(resolve, 2500));
     });
 
-    const job1 = new Job();
-    const job2 = new Job();
-    const job3 = new Job();
+    const job1 = new Job('Job 1');
+    const job2 = new Job('Job 2');
+    const job3 = new Job('Job 3');
 
     await microBatch.submit(job1);
     await microBatch.submit(job2);
     await microBatch.submit(job3);
 
-    jest.advanceTimersByTime(1500);
+    // Advance the timer by 2 intervals due to the long processing time
+    await advanceTimersAndResolvePromises(2);
 
     expect(batchProcessor.processBatch).toHaveBeenCalledTimes(1);
 
-    const shutdownPromise = microBatch.shutdown();
+    microBatch.shutdown();
 
-    jest.advanceTimersByTime(1500);
-
-    await shutdownPromise;
+    await advanceTimersAndResolvePromises(1);
 
     expect(batchProcessor.processBatch).toHaveBeenCalledTimes(2);
     expect(batchProcessor.processBatch).toHaveBeenNthCalledWith(1, [
